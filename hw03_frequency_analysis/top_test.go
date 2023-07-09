@@ -6,9 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Change to true if needed.
-var taskWithAsteriskIsCompleted = false
-
 var text = `Как видите, он  спускается  по  лестнице  вслед  за  своим
 	другом   Кристофером   Робином,   головой   вниз,  пересчитывая
 	ступеньки собственным затылком:  бум-бум-бум.  Другого  способа
@@ -43,40 +40,98 @@ var text = `Как видите, он  спускается  по  лестни�
 	посидеть у огня и послушать какую-нибудь интересную сказку.
 		В этот вечер...`
 
+var shortText = "Текст из четырех слов"
+
+var textWithPunctuationMarks = `cat! and dog, one? ()
+	dog,two :cats and one man; man! cat one... dog.`
+
 func TestTop10(t *testing.T) {
 	t.Run("no words in empty string", func(t *testing.T) {
 		require.Len(t, Top10(""), 0)
 	})
 
+	t.Run("no words in empty string (with asterisk)", func(t *testing.T) {
+		require.Len(t, Top10WithAsterisk(""), 0)
+	})
+
 	t.Run("positive test", func(t *testing.T) {
-		if taskWithAsteriskIsCompleted {
-			expected := []string{
-				"а",         // 8
-				"он",        // 8
-				"и",         // 6
-				"ты",        // 5
-				"что",       // 5
-				"в",         // 4
-				"его",       // 4
-				"если",      // 4
-				"кристофер", // 4
-				"не",        // 4
-			}
-			require.Equal(t, expected, Top10(text))
-		} else {
-			expected := []string{
-				"он",        // 8
-				"а",         // 6
-				"и",         // 6
-				"ты",        // 5
-				"что",       // 5
-				"-",         // 4
-				"Кристофер", // 4
-				"если",      // 4
-				"не",        // 4
-				"то",        // 4
-			}
-			require.Equal(t, expected, Top10(text))
+		expected := []string{
+			"он",        // 8
+			"а",         // 6
+			"и",         // 6
+			"ты",        // 5
+			"что",       // 5
+			"-",         // 4
+			"Кристофер", // 4
+			"если",      // 4
+			"не",        // 4
+			"то",        // 4
 		}
+		require.Equal(t, expected, Top10(text))
+	})
+
+	t.Run("positive test (with asterisk)", func(t *testing.T) {
+		expected := []string{
+			"а",         // 8
+			"он",        // 8
+			"и",         // 6
+			"ты",        // 5
+			"что",       // 5
+			"в",         // 4
+			"его",       // 4
+			"если",      // 4
+			"кристофер", // 4
+			"не",        // 4
+		}
+		require.Equal(t, expected, Top10WithAsterisk(text))
+	})
+
+	t.Run("positive test with short text", func(t *testing.T) {
+		expected := []string{
+			"Текст",
+			"из",
+			"слов",
+			"четырех",
+		}
+		require.Equal(t, expected, Top10(shortText))
+	})
+
+	t.Run("positive test with short text (with asterisk)", func(t *testing.T) {
+		expected := []string{
+			"из",
+			"слов",
+			"текст",
+			"четырех",
+		}
+		require.Equal(t, expected, Top10WithAsterisk(shortText))
+	})
+
+	t.Run("positive test on punctuation marks", func(t *testing.T) {
+		expected := []string{
+			"and",
+			"()",
+			":cats",
+			"cat",
+			"cat!",
+			"dog,",
+			"dog,two",
+			"dog.",
+			"man!",
+			"man;",
+		}
+		require.Equal(t, expected, Top10(textWithPunctuationMarks))
+	})
+
+	t.Run("positive test on punctuation marks (with asterisk)", func(t *testing.T) {
+		expected := []string{
+			"one",
+			"and",
+			"cat",
+			"dog",
+			"man",
+			"cats",
+			"dogtwo",
+		}
+		require.Equal(t, expected, Top10WithAsterisk(textWithPunctuationMarks))
 	})
 }
