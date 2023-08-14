@@ -50,14 +50,72 @@ func TestCache(t *testing.T) {
 	})
 
 	t.Run("purge logic", func(t *testing.T) {
-		// Write me
+		testKeys := []Key{"aaa", "bbb", "ccc"}
+		c := NewCache(len(testKeys))
+
+		for id, key := range testKeys {
+			wasInCache := c.Set(key, id)
+			require.False(t, wasInCache)
+		}
+
+		for id, key := range testKeys {
+			val, ok := c.Get(key)
+			require.True(t, ok)
+			require.Equal(t, id, val)
+		}
+
+		wasInCache := c.Set("ddd", 4)
+		require.False(t, wasInCache)
+
+		val, ok := c.Get(testKeys[0])
+		require.False(t, ok)
+		require.Nil(t, val)
+
+		// теперь не трогаем элемент ddd (он сейчас вначале)
+		// и ждем что он вытолкнется, когда добавим новый эелемент
+		wasInCache = c.Set(testKeys[1], 5)
+		require.True(t, wasInCache)
+
+		val, ok = c.Get(testKeys[2])
+		require.True(t, ok)
+		require.Equal(t, 2, val)
+
+		wasInCache = c.Set("eee", 7)
+		require.False(t, wasInCache)
+
+		val, ok = c.Get("ddd")
+		require.False(t, ok)
+		require.Nil(t, val)
+	})
+
+	t.Run("clear", func(t *testing.T) {
+		testKeys := []Key{"aaa", "bbb", "ccc"}
+		c := NewCache(len(testKeys))
+
+		for id, key := range testKeys {
+			wasInCache := c.Set(key, id)
+			require.False(t, wasInCache)
+		}
+
+		for id, key := range testKeys {
+			val, ok := c.Get(key)
+			require.True(t, ok)
+			require.Equal(t, id, val)
+		}
+
+		c.Clear()
+
+		for _, key := range testKeys {
+			val, ok := c.Get(key)
+			require.False(t, ok)
+			require.Nil(t, val)
+		}
 	})
 }
 
 func TestCacheMultithreading(t *testing.T) {
-	t.Skip() // Remove me if task with asterisk completed.
-
 	c := NewCache(10)
+	t.Log("start TestCacheMultithreading")
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 
@@ -76,4 +134,5 @@ func TestCacheMultithreading(t *testing.T) {
 	}()
 
 	wg.Wait()
+	t.Log("end TestCacheMultithreading")
 }
