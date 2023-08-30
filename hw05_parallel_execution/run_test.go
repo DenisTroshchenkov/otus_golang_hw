@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 )
@@ -66,5 +68,79 @@ func TestRun(t *testing.T) {
 
 		require.Equal(t, runTasksCount, int32(tasksCount), "not all tasks were completed")
 		require.LessOrEqual(t, int64(elapsedTime), int64(sumTime/2), "tasks were run sequentially?")
+	})
+
+	t.Run("invalide params", func(t *testing.T) {
+		err := Run([]Task{}, 0, 0)
+		require.Truef(t, errors.Is(err, ErrWorkersNumberInvalide), "actual err - %v", err)
+
+		err = Run([]Task{}, -1, 0)
+		require.Truef(t, errors.Is(err, ErrWorkersNumberInvalide), "actual err - %v", err)
+
+		err = Run([]Task{}, 10, 0)
+		require.Truef(t, errors.Is(err, ErrTasksNumberInvalide), "actual err - %v", err)
+	})
+
+	t.Run("zero errors", func(t *testing.T) {
+		tasksCount := 10
+		tasks := make([]Task, 0, tasksCount)
+
+		var runTasksCount int32
+
+		for i := 0; i < tasksCount; i++ {
+			err := fmt.Errorf("error from task %d", i)
+			tasks = append(tasks, func() error {
+				time.Sleep(time.Millisecond * time.Duration(rand.Intn(100)))
+				atomic.AddInt32(&runTasksCount, 1)
+				return err
+			})
+		}
+
+		workersCount := 2
+		maxErrorsCount := -1
+		err := Run(tasks, workersCount, maxErrorsCount)
+
+		require.Truef(t, errors.Is(err, ErrErrorsLimitExceeded), "actual err - %v", err)
+		require.LessOrEqual(t, runTasksCount, int32(workersCount+1), "extra tasks were started")
+	})
+
+	// тест на concurrency
+	// будем проверять паралельность через runTasksCount
+	t.Run("check concurrency", func(t *testing.T) {
+		tasksCount := 9
+		tasks := make([]Task, 0, tasksCount+1)
+
+		var runTasksCount int32
+		var wg sync.WaitGroup
+		wg.Add(1)
+		tasks = append(tasks, func() error {
+			if !assert.Zerof(t, atomic.LoadInt32(&runTasksCount), "run task count not zero") {
+				return fmt.Errorf("run task count not zero")
+			}
+			// разблокируем остальные таски
+			wg.Done()
+			// ждем что все таски закончат работу
+			if !assert.Eventuallyf(t, func() bool {
+				return atomic.LoadInt32(&runTasksCount) == int32(tasksCount)
+			}, 15*time.Second, 100*time.Millisecond,
+				"task not work concurrency, %d tasks done",
+				atomic.LoadInt32(&runTasksCount)) {
+				return fmt.Errorf("task not work concurrency")
+			}
+			return nil
+		})
+
+		for i := 0; i < tasksCount; i++ {
+			tasks = append(tasks, func() error {
+				wg.Wait()
+				atomic.AddInt32(&runTasksCount, 1)
+				return nil
+			})
+		}
+
+		workersCount := 20
+		maxErrorsCount := -1
+		err := Run(tasks, workersCount, maxErrorsCount)
+		require.NoError(t, err)
 	})
 }
